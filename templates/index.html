@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TIE Checker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>🪪</text></svg>">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <span class="logo-icon">🪪</span>
+        <h1>TIE Checker</h1>
+      </div>
+      <p class="subtitle">Spanish Foreigner Identity Card Status</p>
+    </header>
+
+    <div class="card" id="mainCard">
+      <!-- INPUT FORM -->
+      <form id="searchForm" class="search-form" onsubmit="return checkStatus(event)">
+        <div class="form-group">
+          <label for="province">Province</label>
+          <select id="province" class="form-select" onchange="updateOffices()">
+            <option value="">Loading...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="office">Office</label>
+          <select id="office" class="form-select" disabled>
+            <option value="">Select province first</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="lote">Your Lote Number</label>
+            <input type="text" id="lote" class="form-input" placeholder="e.g. 119" required>
+          </div>
+          <div class="form-group year-group">
+            <label for="year">Year</label>
+            <select id="year" class="form-select">
+              <option>2026</option>
+              <option>2025</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-check" id="checkBtn">
+          <span class="btn-icon">🔍</span>
+          Check Status
+        </button>
+      </form>
+
+      <!-- RESULTS -->
+      <div class="status-section" id="statusSection">
+        <div class="loader" id="loader" style="display:none;">
+          <div class="spinner"></div>
+          <p>Checking status...</p>
+        </div>
+
+        <div class="results" id="results" style="display:none;">
+          <div class="office-info">
+            <span class="office-icon">📍</span>
+            <span id="resultOffice"></span>
+          </div>
+
+          <div class="status-badge" id="statusBadge">
+            <span class="status-icon" id="statusIcon"></span>
+            <span class="status-text" id="statusText">Checking...</span>
+          </div>
+
+          <div class="lote-grid">
+            <div class="lote-item">
+              <span class="lote-label">Your Lote</span>
+              <span class="lote-value" id="myLote">—</span>
+            </div>
+            <div class="lote-item">
+              <span class="lote-label">Current Lote</span>
+              <span class="lote-value" id="lastLote">—</span>
+            </div>
+            <div class="lote-item">
+              <span class="lote-label">Queue</span>
+              <span class="lote-value" id="queue">—</span>
+            </div>
+          </div>
+
+          <div class="progress-section" id="progressSection">
+            <div class="progress-header">
+              <span>Progress</span>
+              <span id="progressPct">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-info" id="progressInfo"></p>
+          </div>
+
+          <div class="message-box" id="messageBox" style="display:none;">
+            <p id="messageText"></p>
+          </div>
+
+          <div class="last-checked" id="lastChecked"></div>
+        </div>
+
+        <div class="error-box" id="errorBox" style="display:none;">
+          <span class="error-icon">⚠️</span>
+          <p id="errorText"></p>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>developed by 🇵🇭 dj_steve❤️</p>
+    </footer>
+  </div>
+
+  <script>
+    let officesData = {};
+
+    // Load offices data on start
+    fetch('/api/offices')
+      .then(r => r.json())
+      .then(data => {
+        officesData = data;
+        const sel = document.getElementById('province');
+        sel.innerHTML = '<option value="">— Select Province —</option>';
+        Object.keys(data).sort().forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          sel.appendChild(opt);
+        });
+      });
+
+    function updateOffices() {
+      const province = document.getElementById('province').value;
+      const sel = document.getElementById('office');
+      sel.innerHTML = '';
+      sel.disabled = !province;
+
+      if (!province) {
+        sel.innerHTML = '<option value="">Select province first</option>';
+        return;
+      }
+
+      const offices = officesData[province]?.officinas || [];
+      offices.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.officine_id + '||' + o.name;
+        opt.textContent = o.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function checkStatus(e) {
+      e.preventDefault();
+
+      const province = document.getElementById('province').value;
+      const officeRaw = document.getElementById('office').value;
+      const lote = document.getElementById('lote').value.trim();
+
+      if (!province || !officeRaw || !lote) {
+        alert('Please fill all fields');
+        return;
+      }
+
+      const [officeId, officeName] = officeRaw.split('||');
+      const year = document.getElementById('year').value;
+
+      const loader = document.getElementById('loader');
+      const results = document.getElementById('results');
+      const errorBox = document.getElementById('errorBox');
+
+      loader.style.display = 'flex';
+      results.style.display = 'none';
+      errorBox.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/check?province=${encodeURIComponent(province)}&office=${encodeURIComponent(officeName)}&office_id=${officeId}&lote=${lote}&year=${year}`);
+        const data = await res.json();
+
+        loader.style.display = 'none';
+
+        if (data.error) {
+          errorBox.style.display = 'block';
+          document.getElementById('errorText').textContent = data.error;
+          return;
+        }
+
+        results.style.display = 'block';
+
+        document.getElementById('resultOffice').textContent = officeName;
+        document.getElementById('myLote').textContent = data.my_lote;
+        document.getElementById('lastLote').textContent = data.last_lote;
+        document.getElementById('queue').textContent = data.queue || '—';
+
+        const statusBadge = document.getElementById('statusBadge');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressPct = document.getElementById('progressPct');
+        const progressInfo = document.getElementById('progressInfo');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+
+        if (data.flag === 3) {
+          statusBadge.className = 'status-badge ready';
+          statusIcon.textContent = '✅';
+          statusText.textContent = 'READY FOR PICKUP';
+          messageBox.style.display = 'block';
+          messageBox.className = 'message-box success';
+          messageText.textContent = '🎉 Your TIE is ready! Go pick it up at the comisaría.';
+          progressSection.style.display = 'block';
+          progressFill.style.width = '100%';
+          progressPct.textContent = '100%';
+          progressInfo.textContent = 'Ready for collection!';
+        } else if (data.flag === 1) {
+          statusBadge.className = 'status-badge waiting';
+          statusIcon.textContent = '⏳';
+          statusText.textContent = 'Not Ready Yet';
+          messageBox.style.display = 'block';
+          messageBox.className = 'message-box info';
+          messageText.textContent = data.main_message || 'Your TIE is being processed.';
+          progressSection.style.display = 'block';
+          const pct = Math.min(data.pct, 100);
+          progressFill.style.width = pct + '%';
+          progressPct.textContent = pct + '%';
+          progressInfo.textContent = `${data.diff} lot(s) to go`;
+        } else {
+          statusBadge.className = 'status-badge unknown';
+          statusIcon.textContent = '❓';
+          statusText.textContent = data.main_message || 'Unknown Status';
+          messageBox.style.display = 'none';
+          progressSection.style.display = 'none';
+        }
+
+        document.getElementById('lastChecked').textContent = `Last checked: ${data.checked_at}`;
+      } catch (e) {
+        loader.style.display = 'none';
+        errorBox.style.display = 'block';
+        document.getElementById('errorText').textContent = 'Connection failed: ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>

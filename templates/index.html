@@ -6,6 +6,7 @@
   <title>TIE Checker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>🪪</text></svg>">
 </head>
 <body>
@@ -15,7 +16,7 @@
         <span class="logo-icon">🪪</span>
         <h1>TIE Checker</h1>
       </div>
-      <p class="subtitle">Spanish Foreigner Identity Card Status</p>
+      <p class="subtitle">Residence Card Pickup Checker</p>
     </header>
 
     <div class="card" id="mainCard">
@@ -74,18 +75,15 @@
           </div>
 
           <div class="lote-grid">
-            <div class="lote-item">
-              <span class="lote-label">Your Lote</span>
-              <span class="lote-value" id="myLote">—</span>
+            <div class="lote-item yours">
+              <span class="lote-label highlight">Your Lote</span>
+              <span class="lote-value highlight" id="myLote">—</span>
             </div>
-            <div class="lote-item">
+            <div class="lote-item current">
               <span class="lote-label">Current Lote</span>
               <span class="lote-value" id="lastLote">—</span>
             </div>
-            <div class="lote-item">
-              <span class="lote-label">Queue</span>
-              <span class="lote-value" id="queue">—</span>
-            </div>
+
           </div>
 
           <div class="progress-section" id="progressSection">
@@ -196,7 +194,7 @@
         document.getElementById('resultOffice').textContent = officeName;
         document.getElementById('myLote').textContent = data.my_lote;
         document.getElementById('lastLote').textContent = data.last_lote;
-        document.getElementById('queue').textContent = data.queue || '—';
+
 
         const statusBadge = document.getElementById('statusBadge');
         const statusIcon = document.getElementById('statusIcon');
@@ -219,6 +217,11 @@
           progressFill.style.width = '100%';
           progressPct.textContent = '100%';
           progressInfo.textContent = 'Ready for collection!';
+          // confetti celebration
+          if (typeof confetti === 'function') {
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+            setTimeout(() => confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } }), 300);
+          }
         } else if (data.flag === 1) {
           statusBadge.className = 'status-badge waiting';
           statusIcon.textContent = '⏳';
